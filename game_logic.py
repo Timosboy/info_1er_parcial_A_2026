@@ -18,49 +18,14 @@ class Point2D:
 
 
 def get_angle_radians(point_a: Point2D, point_b: Point2D) -> float:
-    """
-    Devuelve el angulo, en radianes, del vector que va de `point_a` a
-    `point_b`, medido desde el eje +x.
-
-    Pista: usar math.atan2 sobre las diferencias dy, dx.
-    """
-    ### ---------------------- ###
-    ### SU IMPLEMENTACION AQUI ###
-    ### ---------------------- ###
-    return 0.0
+    return math.atan2(point_b.y - point_a.y, point_b.x - point_a.x)
 
 
 def get_distance(point_a: Point2D, point_b: Point2D) -> float:
-    """
-    Devuelve la distancia euclidiana en pixeles entre `point_a` y `point_b`.
-    """
-    ### ---------------------- ###
-    ### SU IMPLEMENTACION AQUI ###
-    ### ---------------------- ###
-    return 0.0
+    return math.hypot(point_b.x - point_a.x, point_b.y - point_a.y)
 
 
 def get_impulse_vector(start_point: Point2D, end_point: Point2D) -> ImpulseVector:
-    """
-    Calcula el ImpulseVector que se aplicara al pajaro segun el gesto de
-    arrastre del usuario.
-
-    Convencion del resortera (slingshot):
-      start_point = posicion donde el usuario hace clic (punto de "anclaje")
-      end_point   = posicion donde el usuario suelta el mouse (punto "tirado hacia atras")
-
-    El pajaro debe lanzarse en la direccion OPUESTA al arrastre, asi que
-    el angulo del impulso es el del vector (end_point -> start_point), y
-    la magnitud del impulso es la distancia entre ambos puntos.
-
-    Esquema:
-
-        start (clic)  *<------ arrastre ------ * end (soltar)
-                       ----lanzamiento---->
-
-    Use las dos funciones definidas arriba en esta implementacion.
-    """
-    ### ---------------------- ###
-    ### SU IMPLEMENTACION AQUI ###
-    ### ---------------------- ###
-    return ImpulseVector(0, 0)
+    angulo = get_angle_radians(end_point, start_point)
+    magnitud = get_distance(start_point, end_point)
+    return ImpulseVector(angulo, magnitud)

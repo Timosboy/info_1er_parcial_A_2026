@@ -23,8 +23,9 @@ class Bird(arcade.Sprite):
         elasticity: float = 0.8,
         friction: float = 1,
         collision_layer: int = 0,
+        scale: float = 1,
     ):
-        super().__init__(image_path, 1)
+        super().__init__(image_path, scale)
         # body
         moment = pymunk.moment_for_circle(mass, 0, radius)
         body = pymunk.Body(mass, moment)
@@ -123,47 +124,85 @@ class Column(PassiveObject):
 
 
 class YellowBird(Bird):
-    """
-    Variante del Bird que, mientras esta en vuelo, puede recibir un "boost".
+    def __init__(self, vector_impulso, x, y, espacio, **kwargs):
+        super().__init__("assets/img/rayo.png", vector_impulso, x, y, espacio, scale=0.08, **kwargs)
+        self.turbo_usado = False
 
-    Comportamiento esperado:
-    - Si el usuario hace clic izquierdo mientras este pajaro esta en vuelo,
-      su impulso se multiplica por `power_multiplier` (default 2) aplicado
-      en la direccion ACTUAL de movimiento.
-    - El boost solo deberia aplicarse una vez (no acumular en cada clic).
-    - Recomendacion: usar "assets/img/yellow.png" como sprite.
-
-    Pista: para aplicar el boost, usar
-        self.body.apply_impulse_at_local_point(...)
-    con un vector en la direccion actual de la velocidad del cuerpo
-    (self.body.velocity).
-    """
-
-    ### ---------------------- ###
-    ### SU IMPLEMENTACION AQUI ###
-    ### ---------------------- ###
-    pass
+    def activar(self):
+        if self.turbo_usado:
+            return
+        self.turbo_usado = True
+        vel_actual = self.body.velocity
+        self.body.apply_impulse_at_local_point(vel_actual * self.body.mass)
 
 
 class BlueBird(Bird):
-    """
-    Variante del Bird que se divide en 3 al hacer clic en vuelo.
+    def __init__(self, vector_impulso, x, y, espacio, **kwargs):
+        super().__init__("assets/img/blue.png", vector_impulso, x, y, espacio, scale=0.18, **kwargs)
+        self.dividido = False
 
-    Comportamiento esperado:
-    - Si el usuario hace clic izquierdo mientras este pajaro esta en vuelo,
-      instantaneamente se reemplaza por 3 BlueBirds con direcciones de
-      vuelo separadas por +30, 0 y -30 grados respecto a la direccion
-      actual. La magnitud de la velocidad se preserva.
-    - La division solo deberia ocurrir una vez por pajaro.
-    - Recomendacion: usar "assets/img/blue.png" como sprite.
+    def dividir(self, espacio, sprites, pajaros):
+        if self.dividido:
+            return
+        self.dividido = True
+        vel = self.body.velocity
+        magnitud = vel.length
+        angulo_actual = math.atan2(vel.y, vel.x)
+        for delta in [math.radians(30), math.radians(-30)]:
+            angulo_nuevo = angulo_actual + delta
+            nuevo = BlueBird(ImpulseVector(0, 0), self.center_x, self.center_y, espacio)
+            nuevo.dividido = True
+            nuevo.body.velocity = pymunk.Vec2d(
+                magnitud * math.cos(angulo_nuevo),
+                magnitud * math.sin(angulo_nuevo),
+            )
+            sprites.append(nuevo)
+            pajaros.append(nuevo)
 
-    Pista: para crear los 2 nuevos pajaros se necesita acceso al
-    pymunk.Space y a las SpriteLists del juego. El metodo puede devolver
-    los nuevos pajaros para que main.py los agregue, o recibir las listas
-    como argumento. Esa decision de diseno es parte del ejercicio.
-    """
 
-    ### ---------------------- ###
-    ### SU IMPLEMENTACION AQUI ###
-    ### ---------------------- ###
-    pass
+class PajaroExplosivo(Bird):
+    def __init__(self, vector_impulso, x, y, espacio, **kwargs):
+        super().__init__("assets/img/explosivo.png", vector_impulso, x, y, espacio, scale=0.08, **kwargs)
+        self.explotado = False
+        self.radio = 150
+        self.fuerza = 8000
+
+    def explotar(self):
+        if self.explotado:
+            return
+        self.explotado = True
+        pos = self.body.position
+        for forma in self.body.space.shapes:
+            if forma.body == self.body or forma.body.body_type != pymunk.Body.DYNAMIC:
+                continue
+            diferencia = forma.body.position - pos
+            distancia = diferencia.length
+            if 0 < distancia < self.radio:
+                magnitud = self.fuerza * (1 - distancia / self.radio)
+                forma.body.apply_impulse_at_world_point(
+                    diferencia.normalized() * magnitud,
+                    forma.body.position,
+                )
+
+
+class PajaroRayo(Bird):
+    def __init__(self, vector_impulso, x, y, espacio, **kwargs):
+        super().__init__("assets/img/rayaso.png", vector_impulso, x, y, espacio, scale=0.04, **kwargs)
+        self.rayo_disparado = False
+
+    def disparar_rayo(self, sprites, world):
+        if self.rayo_disparado:
+            return
+        self.rayo_disparado = True
+        pos = self.body.position
+        direccion = self.body.velocity.normalized()
+        punto_fin = pos + direccion * 2000
+        impactos = self.body.space.segment_query(pos, punto_fin, 5, pymunk.ShapeFilter())
+        formas_golpeadas = {hit.shape for hit in impactos if hit.shape != self.shape}
+        for obj in list(world):
+            if hasattr(obj, "shape") and obj.shape in formas_golpeadas:
+                obj.remove_from_sprite_lists()
+                try:
+                    self.body.space.remove(obj.shape, obj.body)
+                except Exception:
+                    pass

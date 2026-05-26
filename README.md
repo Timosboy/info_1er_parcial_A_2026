@@ -108,6 +108,5 @@ Suba su trabajo a un fork publico de este repositorio. Envie UN solo
 correo por grupo a:
 
 - **Destinatario:** eduardo.laruta+tareas@gmail.com
-- **Asunto:** `1era Evaluacion parcial Infografia - Grupo <nombres>`
-- **Contenido:** nombres y codigos de los integrantes + enlace al
-  repositorio.
+- **Asunto:** `1era Evaluacion parcial Infografia - Timothy Kuno`
+- **Contenido:** Paul Timothy Kuno Serrano - 78533.

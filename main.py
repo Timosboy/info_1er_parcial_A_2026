@@ -3,7 +3,7 @@ import logging
 import arcade
 import pymunk
 
-from game_object import Bird, Column, Pig
+from game_object import Bird, Column, Pig, YellowBird, BlueBird, PajaroExplosivo, PajaroRayo
 from game_logic import get_impulse_vector, Point2D, get_distance
 
 logging.basicConfig(level=logging.DEBUG)
@@ -13,10 +13,18 @@ logging.getLogger("PIL").setLevel(logging.WARNING)
 
 logger = logging.getLogger("main")
 
-WIDTH = 1800
-HEIGHT = 800
+WIDTH = 1200
+HEIGHT = 700
 TITLE = "Angry birds"
 GRAVITY = -900
+
+BIRD_NAMES = {
+    "Bird": "Rojo (basico)",
+    "YellowBird": "Amarillo - Turbo [clic der]",
+    "BlueBird": "Azul - Divide x3 [clic der]",
+    "PajaroExplosivo": "Explosivo - Boom [clic der]",
+    "PajaroRayo": "Rayo - Laser [clic der]",
+}
 
 
 class App(arcade.View):
@@ -43,6 +51,10 @@ class App(arcade.View):
         self.end_point = Point2D()
         self.distance = 0
         self.draw_line = False
+
+        self.tipos_pajaros = [Bird, YellowBird, BlueBird, PajaroExplosivo, PajaroRayo]
+        self.indice_pajaro = 0
+        self.pajaro_volando = None
 
         # agregar un collision handler
         self.handler = self.space.add_default_collision_handler()
@@ -76,12 +88,25 @@ class App(arcade.View):
         self.space.step(1 / 60.0)  # actualiza la simulacion de las fisicas
         self.sprites.update(delta_time)
 
+    def _activar_habilidad(self):
+        if isinstance(self.pajaro_volando, YellowBird):
+            self.pajaro_volando.activar()
+        elif isinstance(self.pajaro_volando, BlueBird):
+            self.pajaro_volando.dividir(self.space, self.sprites, self.birds)
+        elif isinstance(self.pajaro_volando, PajaroExplosivo):
+            self.pajaro_volando.explotar()
+        elif isinstance(self.pajaro_volando, PajaroRayo):
+            self.pajaro_volando.disparar_rayo(self.sprites, self.world)
+
     def on_mouse_press(self, x, y, button, modifiers):
         if button == arcade.MOUSE_BUTTON_LEFT:
             self.start_point = Point2D(x, y)
             self.end_point = Point2D(x, y)
             self.draw_line = True
             logger.debug(f"Start Point: {self.start_point}")
+        elif button == arcade.MOUSE_BUTTON_RIGHT:
+            if self.pajaro_volando and self.pajaro_volando.body.velocity.length > 10:
+                self._activar_habilidad()
 
     def on_mouse_drag(self, x: int, y: int, dx: int, dy: int, buttons: int, modifiers: int):
         if buttons == arcade.MOUSE_BUTTON_LEFT:
@@ -89,22 +114,48 @@ class App(arcade.View):
             logger.debug(f"Dragging to: {self.end_point}")
 
     def on_mouse_release(self, x: int, y: int, button: int, modifiers: int):
-        if button == arcade.MOUSE_BUTTON_LEFT:
+        if button == arcade.MOUSE_BUTTON_LEFT and self.draw_line:
             logger.debug(f"Releasing from: {self.end_point}")
             self.draw_line = False
-            impulse_vector = get_impulse_vector(self.start_point, self.end_point)
-            bird = Bird("assets/img/red-bird3.png", impulse_vector, x, y, self.space)
-            self.sprites.append(bird)
-            self.birds.append(bird)
+            vector_impulso = get_impulse_vector(self.start_point, self.end_point)
+            tipo = self.tipos_pajaros[self.indice_pajaro % len(self.tipos_pajaros)]
+            if tipo == Bird:
+                self.pajaro_volando = Bird(
+                    "assets/img/red-bird3.png", vector_impulso,
+                    self.start_point.x, self.start_point.y, self.space,
+                )
+            else:
+                self.pajaro_volando = tipo(
+                    vector_impulso, self.start_point.x, self.start_point.y, self.space,
+                )
+            self.sprites.append(self.pajaro_volando)
+            self.birds.append(self.pajaro_volando)
+            self.indice_pajaro += 1
 
     def on_draw(self):
         self.clear()
-        # arcade.draw_lrwh_rectangle_textured(0, 0, WIDTH, HEIGHT, self.background)
         arcade.draw_texture_rect(self.background, arcade.LRBT(0, WIDTH, 0, HEIGHT))
         self.sprites.draw()
         if self.draw_line:
             arcade.draw_line(self.start_point.x, self.start_point.y, self.end_point.x, self.end_point.y,
                              arcade.color.BLACK, 3)
+        self._draw_hud()
+
+    def _draw_hud(self):
+        tipo_actual = self.tipos_pajaros[self.indice_pajaro % len(self.tipos_pajaros)]
+        nombre_actual = BIRD_NAMES.get(tipo_actual.__name__, tipo_actual.__name__)
+        tipo_sig = self.tipos_pajaros[(self.indice_pajaro + 1) % len(self.tipos_pajaros)]
+        nombre_sig = BIRD_NAMES.get(tipo_sig.__name__, tipo_sig.__name__)
+
+        arcade.draw_rect_filled(arcade.XYWH(110, HEIGHT - 40, 220, 70), (0, 0, 0, 140))
+        arcade.draw_text(f"Siguiente: {nombre_actual}", 10, HEIGHT - 30,
+                         arcade.color.YELLOW, 13, bold=True)
+        arcade.draw_text(f"Despues:   {nombre_sig}", 10, HEIGHT - 50,
+                         arcade.color.WHITE, 11)
+        arcade.draw_text(f"Disparos: {self.indice_pajaro}", 10, HEIGHT - 68,
+                         arcade.color.LIGHT_GRAY, 10)
+        arcade.draw_text("Clic izq+arrastra=lanzar | Clic der=habilidad",
+                         10, 20, arcade.color.WHITE, 11)
 
 
 def main():
